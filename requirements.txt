@@ -1,0 +1,31 @@
+# Core simulation
+recsim>=0.2.4
+tensorflow-cpu>=2.10.0
+gym>=0.21.0,<0.26.0
+
+# Embeddings & IR
+sentence-transformers>=2.2.0
+faiss-cpu>=1.7.4
+numpy>=1.24.0
+scipy>=1.11.0
+
+# LLM
+huggingface-hub>=0.23.0
+jinja2>=3.1.0
+
+# Data
+pandas>=2.0.0
+scikit-learn>=1.3.0
+
+# API (optional standalone IR service)
+fastapi>=0.100.0
+uvicorn>=0.23.0
+requests>=2.31.0
+
+# RS training (Approach B)
+torch>=2.0.0
+tqdm>=4.66.0
+
+# Config & utils
+pyyaml>=6.0
+python-dotenv>=1.0.0

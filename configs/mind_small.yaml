@@ -1,0 +1,48 @@
+dataset:
+  name: mind_small
+  train_news_path: data/MINDsmall_train/news.tsv
+  train_behaviors_path: data/MINDsmall_train/behaviors.tsv
+  dev_news_path: data/MINDsmall_dev/news.tsv
+  dev_behaviors_path: data/MINDsmall_dev/behaviors.tsv
+  index_path: data/mind_small.faiss
+  ids_path: data/mind_small_ids.pkl
+  embeddings_path: data/mind_small_embeddings.npy
+  db_path: data/mind_small.db
+  max_virtual_users: 1000
+  min_real_user_clicks: 10
+  test_ratio: 0.2
+
+ir:
+  model: sentence-transformers/all-MiniLM-L6-v2
+  embed_dim: 384
+  batch_size: 256
+
+simulation:
+  max_steps_per_session: 10
+  sessions_per_user: 5
+  slate_size: 5
+  num_candidates: 20
+  resample_documents: true
+  parallel_workers: 4
+  sim_db_path: data/simulation_small.db
+  seed: 42
+
+llm:
+  model: google/gemma-4-E4B-it
+  max_tokens: 512
+  judge_cache_path: data/judge_cache_small.db
+  batch_size: 10
+
+recommender:
+  embedding_dim: 64
+  mlp_layers: [128, 64, 32]
+  epochs: 20
+  batch_size: 512
+  learning_rate: 0.001
+  n_negatives: 4
+  top_k: 10
+
+evaluation:
+  k: 10
+  min_interactions: 5
+  n_ablation_sizes: [100, 500, 1000]

@@ -1,0 +1,30 @@
+{% if mode == "relevance" %}
+Tu évalues un article de presse pour un lecteur spécifique.
+
+Profil du lecteur :
+  Rôle : {{ role }}
+  Objectif de lecture : {{ goal }}
+
+Article :
+  Titre : « {{ title }} »
+  Résumé : « {{ abstract }} »
+
+Dans quelle mesure cet article correspond-il à l'objectif du lecteur ?
+
+Réponds avec un objet JSON uniquement :
+{"relevance": <0.0 à 1.0>, "reason": "<une phrase expliquant pourquoi>"}
+{% elif mode == "goal_progress" %}
+Tu évalues la progression d'un lecteur vers son objectif après la session {{ session_id }}.
+
+Profil du lecteur :
+  Rôle : {{ role }}
+  Objectif : {{ goal }}
+
+Articles lus lors de cette session :
+  {{ history_summary }}
+
+Quel est le degré de progression vers l'objectif ? Tiens compte de la couverture collective des articles.
+
+Réponds avec un objet JSON uniquement :
+{"progress": <0.0 à 1.0>, "gaps": "<ce qui manque encore pour atteindre pleinement l'objectif>"}
+{% endif %}

@@ -1,0 +1,30 @@
+{% if mode == "relevance" %}
+You are evaluating a news article for a specific reader.
+
+Reader profile:
+  Role: {{ role }}
+  Reading goal: {{ goal }}
+
+Article:
+  Title: "{{ title }}"
+  Abstract: "{{ abstract }}"
+
+How relevant is this article to the reader's goal?
+
+Respond with a JSON object only:
+{"relevance": <0.0 to 1.0>, "reason": "<one sentence explaining why>"}
+{% elif mode == "goal_progress" %}
+You are assessing a reader's progress toward their reading goal after session {{ session_id }}.
+
+Reader profile:
+  Role: {{ role }}
+  Goal: {{ goal }}
+
+Articles read in this session:
+  {{ history_summary }}
+
+How much progress has the reader made toward their goal? Consider whether the articles collectively address the goal.
+
+Respond with a JSON object only:
+{"progress": <0.0 to 1.0>, "gaps": "<what is still missing to fully achieve the goal>"}
+{% endif %}

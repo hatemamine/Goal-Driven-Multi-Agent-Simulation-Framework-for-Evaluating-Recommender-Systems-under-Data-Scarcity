@@ -1,0 +1,26 @@
+You are creating a virtual news reader profile for a recommender system simulation.
+
+Reader archetype: {{ archetype }}
+User ID: {{ user_id }}
+
+Create a realistic news reader profile in English with:
+1. goal: a specific, concrete reading goal for a {{ archetype }} reader (e.g., "Track the latest developments in the US presidential race over the next week").
+2. plan: 3 to 5 ordered steps the reader will take to find relevant news.
+3. expertise_level: "novice", "intermediate", or "expert" — appropriate for a {{ archetype }}.
+4. reading_style: one of "skimmer", "deep-reader", "news-junkie" — appropriate for the archetype.
+5. starting_query: an initial, slightly under-specified search query that a real user might type. Make it natural but not perfectly formulated — this simulates a cold-start user.
+6. session_budget: integer between 5 and 15 — how many articles the user reads per session.
+7. language_pref: "{{ lang }}" (keep this exact value).
+
+The goal must be specific and tied to a real news topic relevant to a {{ archetype }} reader.
+
+Respond with a JSON object only:
+{
+  "goal": "string",
+  "plan": ["step 1", "step 2", ...],
+  "expertise_level": "novice"|"intermediate"|"expert",
+  "reading_style": "skimmer"|"deep-reader"|"news-junkie",
+  "starting_query": "string",
+  "session_budget": int,
+  "language_pref": "{{ lang }}"
+}
