@@ -11,11 +11,11 @@ MindUserState holds:
 from __future__ import annotations
 
 import numpy as np
-from gym import spaces
-from recsim import user
+
+from recsim_env.recsim_compat import AbstractUserState, spaces
 
 
-class MindUserState(user.AbstractUserState):
+class MindUserState(AbstractUserState):
     """Mutable state for one virtual news reader across a session."""
 
     EMBED_DIM = 384

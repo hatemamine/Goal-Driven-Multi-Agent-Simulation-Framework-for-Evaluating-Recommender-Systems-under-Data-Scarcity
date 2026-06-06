@@ -9,13 +9,14 @@ Call order:
 from __future__ import annotations
 
 import numpy as np
-from recsim import user
 from sentence_transformers import SentenceTransformer
+
+from recsim_env.recsim_compat import AbstractUserSampler
 
 from recsim_env.user_state import MindUserState
 
 
-class MindUserSampler(user.AbstractUserSampler):
+class MindUserSampler(AbstractUserSampler):
     """
     Iterates through a fixed pool of virtual user profiles.
     Each call to sample_user() returns the next profile (round-robin).

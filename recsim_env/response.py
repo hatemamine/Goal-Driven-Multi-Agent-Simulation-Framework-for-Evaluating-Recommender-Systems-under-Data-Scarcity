@@ -11,8 +11,8 @@ MindResponse captures what happened when a user was shown a document:
 from __future__ import annotations
 
 import numpy as np
-from gym import spaces
-from recsim import user
+
+from recsim_env.recsim_compat import AbstractResponse, spaces
 
 # Dwell time distributions per reading_style (mean, std) in seconds
 _DWELL_PARAMS: dict[str, tuple[float, float]] = {
@@ -23,7 +23,7 @@ _DWELL_PARAMS: dict[str, tuple[float, float]] = {
 _DEFAULT_DWELL = (45.0, 15.0)
 
 
-class MindResponse(user.AbstractResponse):
+class MindResponse(AbstractResponse):
     """Single-document response from the virtual user."""
 
     def __init__(self):

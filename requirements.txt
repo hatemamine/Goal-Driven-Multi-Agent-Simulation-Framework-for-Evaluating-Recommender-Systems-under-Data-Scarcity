@@ -1,7 +1,6 @@
-# Core simulation
-recsim>=0.2.4
-tensorflow-cpu>=2.10.0
-gym>=0.21.0,<0.26.0
+# RecSim abstraction (shim at recsim_env/recsim_compat.py — no recsim package needed)
+# gym/gymnasium used only for spaces definitions
+gymnasium>=0.29.0
 
 # Embeddings & IR
 sentence-transformers>=2.2.0

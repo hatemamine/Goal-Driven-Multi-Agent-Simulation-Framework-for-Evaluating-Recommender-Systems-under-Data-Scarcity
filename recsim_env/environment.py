@@ -12,9 +12,8 @@ build_environment() returns a RecSimGymEnv ready for the simulation runner.
 from __future__ import annotations
 
 import numpy as np
-from recsim import user
-from recsim.environments import environment
-from recsim.simulator import recsim_gym
+
+from recsim_env.recsim_compat import AbstractUserModel, Environment, RecSimGymEnv
 
 from llm.judge import judge_relevance
 from recsim_env.document import MindDocument, MindDocumentSampler
@@ -23,7 +22,7 @@ from recsim_env.user_sampler import MindUserSampler
 from recsim_env.user_state import MindUserState
 
 
-class MindUserModel(user.AbstractUserModel):
+class MindUserModel(AbstractUserModel):
     """
     Virtual news reader user model.
 
@@ -102,9 +101,16 @@ class MindUserModel(user.AbstractUserModel):
 
 # ── Reward ────────────────────────────────────────────────────────────────────
 
-def reward_aggregator(responses: list[MindResponse]) -> float:
-    """Sum of relevance scores for clicked documents."""
-    return sum(r.relevance for r in responses if r.clicked)
+def reward_aggregator(responses) -> float:
+    """Sum of relevance scores for clicked documents. Accepts MindResponse or observation dicts."""
+    total = 0.0
+    for r in responses:
+        if isinstance(r, dict):
+            if r.get("clicked", 0):
+                total += float(r.get("relevance", 0.0))
+        elif hasattr(r, "clicked") and r.clicked:
+            total += float(r.relevance)
+    return total
 
 
 # ── Factory ───────────────────────────────────────────────────────────────────
@@ -115,7 +121,7 @@ def build_environment(
     slate_size: int = 5,
     num_candidates: int = 20,
     seed: int = 42,
-) -> recsim_gym.RecSimGymEnv:
+) -> RecSimGymEnv:
     """
     Assemble and return a RecSimGymEnv.
 
@@ -124,7 +130,7 @@ def build_environment(
     """
     user_model = MindUserModel(user_sampler, slate_size=slate_size, seed=seed)
 
-    raw_env = environment.Environment(
+    raw_env = Environment(
         user_model=user_model,
         document_sampler=doc_sampler,
         num_candidates=num_candidates,
@@ -132,4 +138,4 @@ def build_environment(
         resample_documents=True,
     )
 
-    return recsim_gym.RecSimGymEnv(raw_env, reward_aggregator)
+    return RecSimGymEnv(raw_env, reward_aggregator)

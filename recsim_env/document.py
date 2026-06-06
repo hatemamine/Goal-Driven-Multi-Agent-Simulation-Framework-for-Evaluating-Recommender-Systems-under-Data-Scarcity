@@ -13,12 +13,12 @@ import sqlite3
 
 import faiss
 import numpy as np
-from gym import spaces
-from recsim import document
 from sentence_transformers import SentenceTransformer
 
+from recsim_env.recsim_compat import AbstractDocument, AbstractDocumentSampler, spaces
 
-class MindDocument(document.AbstractDocument):
+
+class MindDocument(AbstractDocument):
     """A MIND news article as a RecSim document."""
 
     EMBED_DIM = 384
@@ -69,7 +69,7 @@ class MindDocument(document.AbstractDocument):
         return f"MindDocument(id={self._doc_id}, cat={self.coarse_category}, q={self.quality_score:.2f})"
 
 
-class MindDocumentSampler(document.AbstractDocumentSampler):
+class MindDocumentSampler(AbstractDocumentSampler):
     """
     FAISS-backed document sampler.
 
