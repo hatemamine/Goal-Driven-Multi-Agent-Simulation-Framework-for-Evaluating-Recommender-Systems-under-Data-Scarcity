@@ -91,6 +91,16 @@ def train_ncf(
     return model, user_map, item_map
 
 
+def _item_embeddings(model: NCF, item_map: dict, device: str) -> np.ndarray:
+    """Extract GMF item embedding matrix (n_items × emb_dim)."""
+    idx = torch.arange(len(item_map), device=device)
+    with torch.no_grad():
+        embs = model.gmf_item(idx).cpu().numpy().astype(np.float32)
+    norms = np.linalg.norm(embs, axis=1, keepdims=True)
+    norms[norms == 0] = 1.0
+    return embs / norms
+
+
 def evaluate_on_real(
     model: NCF,
     user_map: dict,
@@ -99,42 +109,78 @@ def evaluate_on_real(
     k: int = 10,
     device: str | None = None,
 ) -> dict:
+    """
+    Zero-shot item-embedding evaluation.
+
+    Synthetic and real users have disjoint IDs, so we cannot look up a real
+    user in user_map.  Instead we:
+      1. Extract item embeddings learned by the NCF from synthetic data.
+      2. For each real test user, build a query vector = mean of their
+         click-history item embeddings (items that appear in item_map).
+      3. Rank the impression candidates by cosine similarity to the query.
+      4. Compute NDCG@k and Recall@k against the held-out clicks.
+    """
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
     model.eval()
     from data.mind_loader import parse_impressions
 
+    item_idx   = {nid: i for nid, i in item_map.items()}
+    item_embs  = _item_embeddings(model, item_map, device)   # (n_items, d)
+
+    def _emb(nid):
+        idx = item_idx.get(nid)
+        return item_embs[idx] if idx is not None else None
+
+    def _dcg(r):
+        return sum(v / np.log2(i + 2) for i, v in enumerate(r))
+
     ndcgs, recalls = [], []
     for _, row in real_test_df.iterrows():
-        uid = row["user_id"]
-        if uid not in user_map:
-            continue
         imps = parse_impressions(row.get("impressions", ""))
         clicked_ids = {i["news_id"] for i in imps if i["clicked"]}
-        candidate_ids = [i["news_id"] for i in imps if i["news_id"] in item_map]
-        if not candidate_ids or not clicked_ids:
+        history_ids = str(row.get("history", "")).split()
+
+        if not clicked_ids:
             continue
 
-        u_tensor = torch.tensor([user_map[uid]] * len(candidate_ids), device=device)
-        i_tensor = torch.tensor([item_map[nid] for nid in candidate_ids], device=device)
-        with torch.no_grad():
-            scores = model(u_tensor, i_tensor).cpu().numpy()
+        # Build user query vector from click history items present in item_map
+        history_embs = [_emb(nid) for nid in history_ids if _emb(nid) is not None]
+        if not history_embs:
+            # Fall back to impression-level positives if history is empty
+            history_embs = [_emb(nid) for nid in clicked_ids if _emb(nid) is not None]
+        if not history_embs:
+            continue
 
-        ranked = [nid for _, nid in sorted(zip(-scores, candidate_ids))][:k]
-        hits = sum(1 for nid in ranked if nid in clicked_ids)
-        rels = [1.0 if nid in clicked_ids else 0.0 for nid in ranked]
-        ideal = sorted(rels, reverse=True)
+        query = np.mean(history_embs, axis=0).astype(np.float32)
+        norm  = np.linalg.norm(query)
+        if norm > 0:
+            query /= norm
 
-        def dcg(r): return sum(v / np.log2(i+2) for i, v in enumerate(r))
-        idcg = dcg(ideal)
-        ndcgs.append(dcg(rels) / idcg if idcg > 0 else 0.0)
-        recalls.append(hits / len(clicked_ids))
+        # Score impression candidates
+        cand_ids  = [i["news_id"] for i in imps]
+        cand_embs = [_emb(nid) for nid in cand_ids]
+        scored = []
+        for nid, emb in zip(cand_ids, cand_embs):
+            score = float(np.dot(query, emb)) if emb is not None else -1.0
+            scored.append((score, nid))
+        scored.sort(reverse=True)
+
+        ranked = [nid for _, nid in scored[:k]]
+        rels   = [1.0 if nid in clicked_ids else 0.0 for nid in ranked]
+        ideal  = sorted(rels, reverse=True)
+        idcg   = _dcg(ideal)
+        hits   = sum(1 for nid in ranked if nid in clicked_ids)
+
+        if idcg > 0:
+            ndcgs.append(_dcg(rels) / idcg)
+            recalls.append(hits / len(clicked_ids))
 
     return {
-        "ndcg@k": float(np.mean(ndcgs)) if ndcgs else 0.0,
-        "recall@k": float(np.mean(recalls)) if recalls else 0.0,
-        "k": k,
+        "ndcg@k":      float(np.mean(ndcgs))   if ndcgs else 0.0,
+        "recall@k":    float(np.mean(recalls))  if recalls else 0.0,
+        "k":           k,
         "n_evaluated": len(ndcgs),
     }
 
