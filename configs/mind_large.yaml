@@ -1,48 +1,23 @@
-dataset:
-  name: mind_large
-  train_news_path: data/MINDlarge_train/news.tsv
-  train_behaviors_path: data/MINDlarge_train/behaviors.tsv
-  dev_news_path: data/MINDlarge_dev/news.tsv
-  dev_behaviors_path: data/MINDlarge_dev/behaviors.tsv
-  index_path: data/mind_large.faiss
-  ids_path: data/mind_large_ids.pkl
-  embeddings_path: data/mind_large_embeddings.npy
-  db_path: data/mind_large.db
-  max_virtual_users: 10000
-  min_real_user_clicks: 10
-  test_ratio: 0.2
-
-ir:
-  model: sentence-transformers/all-MiniLM-L6-v2
-  embed_dim: 384
+dataset: mind_large
+mind_path: data/mind_large
+news_file: data/mind_large/train/news.tsv
+behaviors_train: data/mind_large/train/behaviors.tsv
+behaviors_test: data/mind_large/dev/behaviors.tsv
+n_users: 1000000
+embed_model: all-MiniLM-L6-v2
+index_path: data/faiss_large.index
+ids_path: data/corpus_ids_large.npy
+embeddings_path: data/embeddings_large.npy
+news_db_path: data/news_large.db
+sim_db_path: data/simulation_large.db
+slate_size: 5
+num_candidates: 20
+n_virtual_users: 1000
+n_sessions: 3
+parallel_workers: 8
+ncf:
+  emb_dim: 64
+  epochs: 15
   batch_size: 512
-
-simulation:
-  max_steps_per_session: 10
-  sessions_per_user: 5
-  slate_size: 5
-  num_candidates: 20
-  resample_documents: true
-  parallel_workers: 8
-  sim_db_path: data/simulation_large.db
-  seed: 42
-
-llm:
-  model: google/gemma-4-E4B-it
-  max_tokens: 512
-  judge_cache_path: data/judge_cache_large.db
-  batch_size: 10
-
-recommender:
-  embedding_dim: 64
-  mlp_layers: [128, 64, 32]
-  epochs: 20
-  batch_size: 1024
-  learning_rate: 0.001
-  n_negatives: 4
-  top_k: 10
-
-evaluation:
-  k: 10
-  min_interactions: 5
-  n_ablation_sizes: [500, 2000, 5000, 10000]
+  lr: 0.001
+ablation_sizes: [100, 500, 1000]

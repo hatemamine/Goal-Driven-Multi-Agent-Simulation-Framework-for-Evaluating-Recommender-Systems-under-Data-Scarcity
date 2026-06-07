@@ -1,57 +1,27 @@
-"""
-Export simulation interactions to TREC qrels format.
-
-Output: qrels.txt with lines:  user_id  0  doc_id  relevance_grade
-relevance_grade: 0 = not clicked, 1 = clicked low-relevance, 2 = clicked high-relevance
-"""
-
+"""Export synthetic interactions as TREC qrels and run files."""
 from __future__ import annotations
-
-from pathlib import Path
-
-
-def export_trec_qrels(
-    interactions: list[dict],
-    output_path: str,
-    min_relevance: float = 0.3,
-) -> int:
-    """
-    Write qrels.txt from simulation interactions.
-    Only clicked documents are included.
-
-    Returns the number of lines written.
-    """
-    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
-    n = 0
-    with open(output_path, "w", encoding="utf-8") as f:
-        for row in interactions:
-            if int(row.get("clicked", 0)) == 0:
-                continue
-            rel = float(row.get("relevance", 0.5))
-            # Map continuous relevance to TREC grades 1-2
-            grade = 2 if rel >= 0.7 else 1
-            f.write(f"{row['user_id']}\t0\t{row['doc_id']}\t{grade}\n")
-            n += 1
-    print(f"[trec_export] Wrote {n} qrels to {output_path}")
-    return n
+import sqlite3
+import pandas as pd
 
 
-def export_trec_run(
-    recommendations: list[dict],
-    output_path: str,
-    run_tag: str = "sim_run",
-) -> int:
-    """
-    Write a TREC run file from recommendations.
-    recommendations: list of {user_id, doc_id, score, rank}
-    """
-    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
-    n = 0
-    with open(output_path, "w", encoding="utf-8") as f:
-        for row in recommendations:
-            rank = int(row.get("rank", 1))
-            score = float(row.get("score", 0.0))
-            f.write(f"{row['user_id']} Q0 {row['doc_id']} {rank} {score:.6f} {run_tag}\n")
-            n += 1
-    print(f"[trec_export] Wrote {n} run lines to {output_path}")
-    return n
+def export_trec(sim_db_path: str, qrels_path: str, run_path: str):
+    con = sqlite3.connect(sim_db_path)
+    df = pd.read_sql(
+        "SELECT user_id, news_id, relevance, clicked, step FROM interactions", con
+    )
+    con.close()
+
+    with open(qrels_path, "w") as f:
+        for _, row in df[df["clicked"] == 1].iterrows():
+            rel_int = min(2, int(round(row["relevance"] * 2)))
+            f.write(f"{row['user_id']} 0 {row['news_id']} {rel_int}\n")
+
+    df["score"] = df["relevance"]
+    df_sorted = df.sort_values(["user_id", "score"], ascending=[True, False])
+    with open(run_path, "w") as f:
+        for uid, group in df_sorted.groupby("user_id"):
+            for rank, (_, row) in enumerate(group.iterrows(), 1):
+                f.write(f"{uid} Q0 {row['news_id']} {rank} {row['score']:.4f} SIM\n")
+
+    print(f"[export] TREC qrels → {qrels_path}")
+    print(f"[export] TREC run  → {run_path}")

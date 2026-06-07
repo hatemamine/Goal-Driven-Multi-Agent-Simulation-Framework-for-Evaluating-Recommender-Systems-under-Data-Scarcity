@@ -1,145 +1,122 @@
-"""
-Virtual news-reader persona generator for MIND simulation.
-
-Five archetypes (calibrated to MIND category clusters):
-  breaking_news_follower  28%   en
-  topic_specialist        22%   bilingual
-  casual_browser          20%   en
-  sentiment_tracker       15%   fr
-  deep_reader             15%   fr
-
-Archetype distributions are approximate; recalibrate from real MIND cluster
-sizes by calling calibrate_distribution() after cluster_users().
-"""
-
+"""Virtual user profile generator — 5 archetypes, bilingual EN/FR."""
 from __future__ import annotations
-
 import random
+import traceback
+from typing import Optional
 
-from llm.judge import generate
-
-# Default archetype distribution (en=English persona, fr=French persona)
-_ARCHETYPES: list[tuple[str, float, str]] = [
-    ("breaking_news_follower", 0.28, "en"),
-    ("topic_specialist",       0.22, "en"),
-    ("casual_browser",         0.20, "en"),
-    ("sentiment_tracker",      0.15, "fr"),
-    ("deep_reader",            0.15, "fr"),
+ARCHETYPES = [
+    {"name": "breaking_news_follower", "lang": "en",
+     "goal_template": "Follow today's top breaking news stories and stay updated on major events.",
+     "role_template": "Journalist intern", "reading_style": "skimmer", "session_budget": 25},
+    {"name": "topic_specialist", "lang": "en",
+     "goal_template": "Deep-dive into recent developments in technology and science.",
+     "role_template": "Research analyst", "reading_style": "deep_reader", "session_budget": 15},
+    {"name": "casual_browser", "lang": "en",
+     "goal_template": "Find something interesting to read today.",
+     "role_template": "General reader", "reading_style": "balanced", "session_budget": 20},
+    {"name": "sentiment_tracker", "lang": "fr",
+     "goal_template": "Suivre le sentiment des médias sur les sujets politiques et économiques.",
+     "role_template": "Analyste en communication", "reading_style": "skimmer", "session_budget": 20},
+    {"name": "deep_reader", "lang": "fr",
+     "goal_template": "Lire des analyses approfondies sur la société et la culture.",
+     "role_template": "Chercheur universitaire", "reading_style": "deep_reader", "session_budget": 12},
 ]
 
-_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "goal":            {"type": "string", "description": "Specific reading goal"},
-        "plan":            {"type": "array",  "description": "3-5 ordered reading steps"},
-        "expertise_level": {"type": "string", "description": "novice|intermediate|expert"},
-        "reading_style":   {"type": "string", "description": "skimmer|deep-reader|news-junkie"},
-        "starting_query":  {"type": "string", "description": "Initial under-specified query"},
-        "session_budget":  {"type": "integer","description": "Articles read per session (5-15)"},
-        "language_pref":   {"type": "string", "description": "en|fr|bilingual"},
-    },
-    "required": ["goal", "plan", "expertise_level", "reading_style",
-                 "starting_query", "session_budget", "language_pref"],
-}
+_SHARES = [0.28, 0.22, 0.20, 0.15, 0.15]
 
 
-def _archetype_weight(distributions: list[tuple[str, float, str]] | None = None) -> list[tuple[str, str]]:
-    dist = distributions or _ARCHETYPES
-    archetypes = [(a, lang) for a, _, lang in dist]
-    weights = [w for _, w, _ in dist]
-    return archetypes, weights
-
-
-def _generate_one(user_id: str, archetype: str, lang: str) -> dict:
-    from jinja2 import Environment, FileSystemLoader
-    from pathlib import Path
-
-    tmpl_dir = Path(__file__).parent.parent / "llm" / "prompts"
-    jinja = Environment(loader=FileSystemLoader(str(tmpl_dir)), trim_blocks=True)
-    tpl = jinja.get_template(f"persona_{lang if lang in ('en', 'fr') else 'en'}.j2")
-    prompt = tpl.render(archetype=archetype, user_id=user_id, lang=lang)
-
-    profile = generate(prompt, _SCHEMA, lang=lang)
-
-    # Validate and apply defaults
-    profile.setdefault("expertise_level", "intermediate")
-    profile.setdefault("reading_style", "news-junkie")
-    profile.setdefault("session_budget", 10)
-    profile.setdefault("language_pref", lang)
-    if not isinstance(profile.get("plan"), list):
-        profile["plan"] = [profile.get("goal", "Read news")]
-    profile["session_budget"] = max(5, min(15, int(profile["session_budget"])))
-
+def _fallback_profile(user_id: str, archetype: dict) -> dict:
     return {
         "user_id": user_id,
-        "role": archetype,
-        **profile,
+        "archetype": archetype["name"],
+        "language_pref": archetype["lang"],
+        "goal": archetype["goal_template"],
+        "role": archetype["role_template"],
+        "topics": [],
+        "reading_style": archetype["reading_style"],
+        "session_budget": archetype["session_budget"],
+        "clicked_titles": [],
+        "current_query": archetype["goal_template"][:80],
     }
+
+
+def _llm_profile(user_id: str, archetype: dict) -> dict:
+    from llm.judge import generate
+    from pathlib import Path
+    from jinja2 import Environment, FileSystemLoader
+
+    lang = archetype["lang"]
+    prompts_dir = Path(__file__).parent.parent / "llm" / "prompts"
+    jinja = Environment(loader=FileSystemLoader(str(prompts_dir)), trim_blocks=True)
+    tpl = jinja.get_template(f"persona_{lang}.j2")
+    prompt = tpl.render(archetype=archetype["name"], language_pref=lang)
+
+    schema = {
+        "properties": {
+            "goal": {"type": "string", "description": "specific reading goal"},
+            "role": {"type": "string", "description": "occupation"},
+            "topics": {"type": "array", "description": "preferred topics"},
+            "reading_style": {"type": "string", "enum": ["skimmer", "balanced", "deep_reader"]},
+            "session_budget": {"type": "integer", "description": "articles per session"},
+        }
+    }
+    result = generate(prompt, schema, lang=lang)
+
+    profile = _fallback_profile(user_id, archetype)
+    profile.update({
+        "goal": str(result.get("goal", archetype["goal_template"])),
+        "role": str(result.get("role", archetype["role_template"])),
+        "topics": result.get("topics", []),
+        "reading_style": result.get("reading_style", archetype["reading_style"]),
+        "session_budget": int(result.get("session_budget", archetype["session_budget"])),
+    })
+    profile["current_query"] = profile["goal"][:80]
+    return profile
 
 
 def generate_users(
     n: int,
-    distributions: list[tuple[str, float, str]] | None = None,
+    distributions: Optional[list[float]] = None,
     seed: int = 42,
+    use_llm: bool = True,
 ) -> list[dict]:
-    """
-    Generate n virtual user profiles.
-
-    distributions: list of (archetype_name, weight, lang). Defaults to _ARCHETYPES.
-    """
-    random.seed(seed)
-    archetypes, weights = _archetype_weight(distributions)
-
-    # Sample n archetypes according to weights
-    selected = random.choices(archetypes, weights=weights, k=n)
+    rng = random.Random(seed)
+    shares = distributions if distributions else _SHARES
+    # normalise
+    total = sum(shares)
+    shares = [s / total for s in shares]
 
     users = []
-    for i, (archetype, lang) in enumerate(selected):
-        user_id = f"vuser_{i + 1:04d}"
-        print(f"[persona] {user_id}: {archetype} ({lang})")
-        try:
-            user_dict = _generate_one(user_id, archetype, lang)
-            users.append(user_dict)
-        except Exception as e:
-            print(f"  [warn] Failed to generate {user_id}: {e} — using fallback profile")
-            users.append(_fallback_profile(user_id, archetype, lang))
+    for i in range(1, n + 1):
+        user_id = f"vuser_{i:04d}"
+        r = rng.random()
+        cumulative = 0.0
+        archetype = ARCHETYPES[-1]
+        for arc, share in zip(ARCHETYPES, shares):
+            cumulative += share
+            if r < cumulative:
+                archetype = arc
+                break
+        print(f"[persona] {user_id}: {archetype['name']} ({archetype['lang']})")
+
+        if use_llm:
+            try:
+                profile = _llm_profile(user_id, archetype)
+            except Exception as e:
+                tb = traceback.format_exc()
+                print(f"  [warn] Failed to generate {user_id}: {type(e).__name__}: {e}")
+                print(f"  [warn] Traceback:\n{tb}")
+                profile = _fallback_profile(user_id, archetype)
+        else:
+            profile = _fallback_profile(user_id, archetype)
+
+        users.append(profile)
 
     return users
 
 
-def calibrate_distribution(
-    cluster_dist: dict[str, float],
-) -> list[tuple[str, float, str]]:
-    """
-    Recalibrate archetype weights from real MIND cluster distribution.
-    cluster_dist: {archetype_name: fraction} from mind_loader.cluster_users()
-    """
-    archetype_names = [a for a, _, _ in _ARCHETYPES]
-    lang_map = {a: lang for a, _, lang in _ARCHETYPES}
-    result = []
-    total = sum(cluster_dist.values()) or 1.0
-    for name in archetype_names:
-        w = cluster_dist.get(name, 1.0 / len(archetype_names)) / total
-        result.append((name, w, lang_map[name]))
-    return result
-
-
-def _fallback_profile(user_id: str, archetype: str, lang: str) -> dict:
-    fallbacks = {
-        "breaking_news_follower": "Follow today's top news stories",
-        "topic_specialist": "Deeply research recent developments in technology",
-        "casual_browser": "Find something interesting to read today",
-        "sentiment_tracker": "Understand public reaction to recent events",
-        "deep_reader": "Get comprehensive background on a current global issue",
-    }
-    return {
-        "user_id": user_id,
-        "role": archetype,
-        "goal": fallbacks.get(archetype, "Read news"),
-        "plan": ["Search for news", "Read relevant articles", "Refine understanding"],
-        "expertise_level": "intermediate",
-        "reading_style": "news-junkie",
-        "starting_query": "latest news",
-        "session_budget": 10,
-        "language_pref": lang,
-    }
+def calibrate_distribution(cluster_dist: list[float]) -> list[float]:
+    n = len(ARCHETYPES)
+    raw = list(cluster_dist[:n]) + [0.1] * max(0, n - len(cluster_dist))
+    total = sum(raw)
+    return [v / total for v in raw[:n]]

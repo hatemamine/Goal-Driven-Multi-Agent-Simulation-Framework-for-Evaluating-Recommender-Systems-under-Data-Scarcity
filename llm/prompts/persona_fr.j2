@@ -1,26 +1,20 @@
-Tu crées un profil de lecteur de presse virtuel pour une simulation de système de recommandation.
+Générez un persona virtuel réaliste de lecteur d'actualités pour une simulation de système de recommandation.
 
-Archétype du lecteur : {{ archetype }}
-ID utilisateur : {{ user_id }}
+Archétype : {{ archetype }}
+Préférence linguistique : {{ language_pref }}
 
-Crée un profil réaliste de lecteur de presse en français avec :
-1. goal : un objectif de lecture spécifique et concret pour un lecteur de type {{ archetype }} (ex. : « Suivre l'évolution de la situation politique au Moyen-Orient cette semaine »).
-2. plan : 3 à 5 étapes ordonnées que le lecteur suivra pour trouver les actualités pertinentes.
-3. expertise_level : "novice", "intermediate" ou "expert" — adapté à l'archétype {{ archetype }}.
-4. reading_style : l'un de "skimmer", "deep-reader", "news-junkie" — adapté à l'archétype.
-5. starting_query : une requête initiale légèrement imprécise, comme un utilisateur réel la saisirait. La formuler naturellement mais pas parfaitement — cela simule un utilisateur en démarrage à froid.
-6. session_budget : entier entre 5 et 15 — nombre d'articles lus par session.
-7. language_pref : "{{ lang }}" (conserver cette valeur exacte).
+Le persona doit avoir :
+- Un objectif de lecture spécifique et concret pour la semaine en cours
+- Un rôle/profession réaliste
+- Des sujets d'actualité préférés (2-4 sujets)
+- Un style de lecture : parmi ["skimmer", "balanced", "deep_reader"]
+- Un budget de session (nombre d'articles par session) : entier entre 10 et 30
 
-L'objectif doit être spécifique et lié à un sujet d'actualité réel, pertinent pour un lecteur de type {{ archetype }}.
-
-Réponds avec un objet JSON uniquement :
+Répondez UNIQUEMENT avec du JSON valide :
 {
-  "goal": "string",
-  "plan": ["étape 1", "étape 2", ...],
-  "expertise_level": "novice"|"intermediate"|"expert",
-  "reading_style": "skimmer"|"deep-reader"|"news-junkie",
-  "starting_query": "string",
-  "session_budget": int,
-  "language_pref": "{{ lang }}"
+  "goal": "<objectif de lecture spécifique>",
+  "role": "<profession/rôle>",
+  "topics": ["<sujet1>", "<sujet2>"],
+  "reading_style": "<skimmer|balanced|deep_reader>",
+  "session_budget": <int>
 }

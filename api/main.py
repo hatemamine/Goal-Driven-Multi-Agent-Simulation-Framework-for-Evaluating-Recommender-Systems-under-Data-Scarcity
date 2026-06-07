@@ -1,117 +1,43 @@
-"""
-Standalone FastAPI IR service over the MIND news corpus.
-Provides HTTP search used optionally by external tools.
-(The simulation runner queries FAISS directly — this is for inspection / standalone use.)
-
-Endpoints:
-  GET /search?query=...&top_k=20   → search results
-  POST /rebuild                     → rebuild FAISS index from news.tsv
-  GET /health                       → service status
-"""
-
+"""Optional FastAPI IR service for querying the news index."""
 from __future__ import annotations
-
-from contextlib import asynccontextmanager
-
-import faiss
-import numpy as np
-from fastapi import FastAPI, HTTPException, Query
+import os
+from pathlib import Path
+from fastapi import FastAPI, Query
 from pydantic import BaseModel
-from sentence_transformers import SentenceTransformer
 
-from api.config import (BIENCODER_MODEL, CORPUS_PATH, FAISS_INDEX_PATH,
-                         CORPUS_IDS_PATH, EMBEDDINGS_PATH, DB_PATH,
-                         DEFAULT_TOP_K, BATCH_SIZE)
-from data.mind_loader import load_news
-from data.news_preprocessor import build_index, load_index, search
+app = FastAPI(title="MIND News Search API")
 
-
-# ── Global state ──────────────────────────────────────────────────────────────
-
-_model: SentenceTransformer | None = None
-_index: faiss.Index | None = None
-_corpus_ids: list[str] | None = None
-_embeddings: np.ndarray | None = None
+_index = None
+_corpus_ids = None
 _db_con = None
+_embed_model = None
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    global _model, _index, _corpus_ids, _embeddings, _db_con
-    import os
-    if os.path.exists(FAISS_INDEX_PATH) and os.path.exists(CORPUS_IDS_PATH):
-        _index, _corpus_ids, _embeddings, _db_con = load_index(
-            FAISS_INDEX_PATH, CORPUS_IDS_PATH, EMBEDDINGS_PATH, DB_PATH
-        )
-        print(f"[api] Index loaded: {_index.ntotal} docs")
-    else:
-        print("[api] No index found — call POST /rebuild to build one.")
-    _model = SentenceTransformer(BIENCODER_MODEL)
-    yield
-    if _db_con:
-        _db_con.close()
+def _load():
+    global _index, _corpus_ids, _db_con, _embed_model
+    if _index is not None:
+        return
+    from sentence_transformers import SentenceTransformer
+    from data.news_preprocessor import load_index
+    cfg_index = os.getenv("INDEX_PATH", "data/faiss.index")
+    cfg_ids = os.getenv("IDS_PATH", "data/corpus_ids.npy")
+    cfg_emb = os.getenv("EMBEDDINGS_PATH", "data/embeddings.npy")
+    cfg_db = os.getenv("NEWS_DB_PATH", "data/news.db")
+    _index, _corpus_ids, _, _db_con = load_index(cfg_index, cfg_ids, cfg_emb, cfg_db)
+    _embed_model = SentenceTransformer(os.getenv("EMBED_MODEL", "all-MiniLM-L6-v2"))
 
 
-app = FastAPI(title="MIND News IR API", lifespan=lifespan)
-
-
-# ── Response models ────────────────────────────────────────────────────────────
-
-class Document(BaseModel):
-    id: str
+class SearchResult(BaseModel):
+    news_id: str
     title: str
-    abstract: str
     category: str
-    coarse_category: str
     score: float
 
 
-class SearchResponse(BaseModel):
-    query: str
-    results: list[Document]
-
-
-class HealthResponse(BaseModel):
-    status: str
-    n_docs: int
-
-
-# ── Endpoints ─────────────────────────────────────────────────────────────────
-
-@app.get("/search", response_model=SearchResponse)
-def search_endpoint(
-    query: str = Query(..., min_length=1, max_length=500),
-    top_k: int = Query(DEFAULT_TOP_K, ge=1, le=1000),
-):
-    if _index is None or _model is None:
-        raise HTTPException(503, "Index not loaded. Call POST /rebuild first.")
-    results = search(query, _model, _index, _corpus_ids, _db_con, top_k=top_k)
-    return SearchResponse(
-        query=query,
-        results=[Document(**{k: r[k] for k in Document.model_fields}) for r in results],
-    )
-
-
-@app.post("/rebuild")
-def rebuild_endpoint():
-    global _index, _corpus_ids, _embeddings, _db_con
-    import os
-    if not os.path.exists(CORPUS_PATH):
-        raise HTTPException(404, f"Corpus not found: {CORPUS_PATH}")
-
-    news_df = load_news(CORPUS_PATH)
-    _index, _corpus_ids, _embeddings = build_index(
-        news_df, FAISS_INDEX_PATH, CORPUS_IDS_PATH, EMBEDDINGS_PATH, DB_PATH,
-        model_name=BIENCODER_MODEL, batch_size=BATCH_SIZE,
-    )
-    import sqlite3
-    _db_con = sqlite3.connect(DB_PATH, check_same_thread=False)
-    return {"status": "ok", "n_docs": _index.ntotal}
-
-
-@app.get("/health", response_model=HealthResponse)
-def health():
-    return HealthResponse(
-        status="ok" if _index is not None else "no_index",
-        n_docs=_index.ntotal if _index is not None else 0,
-    )
+@app.get("/search", response_model=list[SearchResult])
+def search(q: str = Query(..., min_length=2), top_k: int = 10):
+    _load()
+    from data.news_preprocessor import search as _search
+    results = _search(q, _embed_model, _index, _corpus_ids, _db_con, top_k=top_k)
+    return [SearchResult(news_id=r["news_id"], title=r["title"],
+                         category=r["category"], score=r["score"]) for r in results]
