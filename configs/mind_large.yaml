@@ -1,23 +1,37 @@
-dataset: mind_large
-mind_path: data/mind_large
-news_file: data/mind_large/train/news.tsv
-behaviors_train: data/mind_large/train/behaviors.tsv
-behaviors_test: data/mind_large/dev/behaviors.tsv
-n_users: 1000000
-embed_model: all-MiniLM-L6-v2
-index_path: data/faiss_large.index
-ids_path: data/corpus_ids_large.npy
-embeddings_path: data/embeddings_large.npy
-news_db_path: data/news_large.db
-sim_db_path: data/simulation_large.db
-slate_size: 5
-num_candidates: 20
-n_virtual_users: 1000
-n_sessions: 3
-parallel_workers: 8
+dataset:
+  name: mind_large
+  mind_path: data/mind_large
+  news_file: data/mind_large/train/news.tsv
+  behaviors_train: data/mind_large/train/behaviors.tsv
+  behaviors_test: data/mind_large/dev/behaviors.tsv
+  n_users: 1000000
+
+ir:
+  embed_model: all-MiniLM-L6-v2
+  index_path: data/faiss_large.index
+  ids_path: data/corpus_ids_large.npy
+  embeddings_path: data/embeddings_large.npy
+  news_db_path: data/news_large.db
+
+simulation:
+  sim_db_path: data/simulation_large.db
+  slate_size: 5
+  num_candidates: 20
+  n_virtual_users: 1000
+  n_sessions: 3
+  parallel_workers: 8
+  seed: 42
+  max_virtual_users: 1000
+  use_llm_persona: true
+
 ncf:
   emb_dim: 64
   epochs: 15
   batch_size: 512
   lr: 0.001
+
+evaluation:
+  replay_k: 10
+  approach_b_k: 10
+
 ablation_sizes: [100, 500, 1000]

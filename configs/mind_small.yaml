@@ -1,23 +1,37 @@
-dataset: mind_small
-mind_path: data/mind_small
-news_file: data/mind_small/train/news.tsv
-behaviors_train: data/mind_small/train/behaviors.tsv
-behaviors_test: data/mind_small/dev/behaviors.tsv
-n_users: 50000
-embed_model: all-MiniLM-L6-v2
-index_path: data/faiss_small.index
-ids_path: data/corpus_ids_small.npy
-embeddings_path: data/embeddings_small.npy
-news_db_path: data/news_small.db
-sim_db_path: data/simulation_small.db
-slate_size: 5
-num_candidates: 20
-n_virtual_users: 100
-n_sessions: 3
-parallel_workers: 4
+dataset:
+  name: mind_small
+  mind_path: data/mind_small
+  news_file: data/mind_small/train/news.tsv
+  behaviors_train: data/mind_small/train/behaviors.tsv
+  behaviors_test: data/mind_small/dev/behaviors.tsv
+  n_users: 50000
+
+ir:
+  embed_model: all-MiniLM-L6-v2
+  index_path: data/faiss_small.index
+  ids_path: data/corpus_ids_small.npy
+  embeddings_path: data/embeddings_small.npy
+  news_db_path: data/news_small.db
+
+simulation:
+  sim_db_path: data/simulation_small.db
+  slate_size: 5
+  num_candidates: 20
+  n_virtual_users: 100
+  n_sessions: 3
+  parallel_workers: 4
+  seed: 42
+  max_virtual_users: 100
+  use_llm_persona: true
+
 ncf:
   emb_dim: 32
   epochs: 10
   batch_size: 256
   lr: 0.001
+
+evaluation:
+  replay_k: 10
+  approach_b_k: 10
+
 ablation_sizes: [100, 500, 1000]
