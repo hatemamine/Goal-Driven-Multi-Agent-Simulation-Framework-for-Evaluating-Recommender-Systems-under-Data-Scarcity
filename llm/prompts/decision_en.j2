@@ -1,0 +1,15 @@
+You are a goal-driven news reader agent. Based on your reading goal and the available articles, decide which articles to read next and update your search query.
+
+Your goal: {{ goal }}
+Your role: {{ role }}
+Current session step: {{ step }}
+Articles read so far: {{ history_summary }}
+
+Available articles (top candidates):
+{% for doc in candidates %}
+[{{ loop.index0 }}] {{ doc.title }} ({{ doc.category }})
+{% endfor %}
+
+Choose up to {{ slate_size }} article indices to read (0-indexed), and provide an updated search query.
+Reply ONLY with valid JSON:
+{"selected_indices": [<int>, ...], "next_query": "<search query string>", "reasoning": "<brief>"}

@@ -1,0 +1,23 @@
+{% if mode == "relevance" %}
+You are a news relevance judge. Given a reader's goal and a news article, rate how relevant the article is to the goal.
+
+Reader goal: {{ goal }}
+Reader role: {{ role }}
+
+Article title: {{ title }}
+Article abstract: {{ abstract }}
+
+Rate the relevance from 0.0 (completely irrelevant) to 1.0 (perfectly relevant).
+Reply ONLY with valid JSON:
+{"relevance": <float 0-1>, "reason": "<one sentence>"}
+{% elif mode == "goal_progress" %}
+You are evaluating how much a reader has progressed toward their reading goal based on articles they clicked.
+
+Reader goal: {{ goal }}
+Reader role: {{ role }}
+Session {{ session_id }} — articles read: {{ history_summary }}
+
+Rate the goal progress from 0.0 (no progress) to 1.0 (goal fully satisfied).
+Reply ONLY with valid JSON:
+{"progress": <float 0-1>, "gaps": "<what topics are still missing>"}
+{% endif %}

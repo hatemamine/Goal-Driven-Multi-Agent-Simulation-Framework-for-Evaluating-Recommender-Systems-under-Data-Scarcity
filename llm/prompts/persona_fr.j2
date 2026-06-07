@@ -1,0 +1,20 @@
+Générez un persona virtuel réaliste de lecteur d'actualités pour une simulation de système de recommandation.
+
+Archétype : {{ archetype }}
+Préférence linguistique : {{ language_pref }}
+
+Le persona doit avoir :
+- Un objectif de lecture spécifique et concret pour la semaine en cours
+- Un rôle/profession réaliste
+- Des sujets d'actualité préférés (2-4 sujets)
+- Un style de lecture : parmi ["skimmer", "balanced", "deep_reader"]
+- Un budget de session (nombre d'articles par session) : entier entre 10 et 30
+
+Répondez UNIQUEMENT avec du JSON valide :
+{
+  "goal": "<objectif de lecture spécifique>",
+  "role": "<profession/rôle>",
+  "topics": ["<sujet1>", "<sujet2>"],
+  "reading_style": "<skimmer|balanced|deep_reader>",
+  "session_budget": <int>
+}

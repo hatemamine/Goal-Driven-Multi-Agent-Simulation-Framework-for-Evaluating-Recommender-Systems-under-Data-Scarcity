@@ -1,0 +1,20 @@
+Generate a realistic virtual news reader persona for a recommender system simulation.
+
+Archetype: {{ archetype }}
+Language preference: {{ language_pref }}
+
+The persona should have:
+- A specific, concrete reading goal for the current week
+- A realistic role/occupation
+- Preferred news topics (2-4 topics)
+- A reading style: one of ["skimmer", "balanced", "deep_reader"]
+- A session budget (number of articles per session): integer between 10 and 30
+
+Reply ONLY with valid JSON:
+{
+  "goal": "<specific reading goal>",
+  "role": "<occupation/role>",
+  "topics": ["<topic1>", "<topic2>"],
+  "reading_style": "<skimmer|balanced|deep_reader>",
+  "session_budget": <int>
+}

@@ -1,0 +1,15 @@
+Vous êtes un agent lecteur d'actualités orienté objectif. Sur la base de votre objectif de lecture et des articles disponibles, décidez quels articles lire ensuite et mettez à jour votre requête de recherche.
+
+Votre objectif : {{ goal }}
+Votre rôle : {{ role }}
+Étape de session actuelle : {{ step }}
+Articles lus jusqu'ici : {{ history_summary }}
+
+Articles disponibles (meilleurs candidats) :
+{% for doc in candidates %}
+[{{ loop.index0 }}] {{ doc.title }} ({{ doc.category }})
+{% endfor %}
+
+Choisissez jusqu'à {{ slate_size }} indices d'articles à lire (indexés à 0), et fournissez une requête de recherche mise à jour.
+Répondez UNIQUEMENT avec du JSON valide :
+{"selected_indices": [<int>, ...], "next_query": "<chaîne de requête>", "reasoning": "<bref>"}

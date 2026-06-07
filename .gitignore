@@ -1,0 +1,27 @@
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# FAISS indices and large data artefacts
+*.faiss
+*.npy
+*.pkl
+
+# SQLite databases
+*.db
+
+# Environment / secrets
+.env
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# IDE
+.vscode/
+.idea/

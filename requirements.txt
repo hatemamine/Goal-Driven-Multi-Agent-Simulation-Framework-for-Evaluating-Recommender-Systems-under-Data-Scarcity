@@ -1,0 +1,34 @@
+# RecSim abstraction (shim at recsim_env/recsim_compat.py — no recsim package needed)
+# gym/gymnasium used only for spaces definitions
+gymnasium>=0.29.0
+
+# Embeddings & IR
+sentence-transformers>=2.2.0
+faiss-cpu>=1.7.4
+numpy>=1.24.0
+scipy>=1.11.0
+
+# LLM — local inference
+transformers>=4.45.0
+accelerate>=0.30.0
+huggingface-hub>=0.23.0   # still needed for model download (hf_hub_download)
+jinja2>=3.1.0
+# Optional: 4-bit NF4 quantisation on CUDA (recommended for GPU runs)
+# bitsandbytes>=0.43.0
+
+# Data
+pandas>=2.0.0
+scikit-learn>=1.3.0
+
+# API (optional standalone IR service)
+fastapi>=0.100.0
+uvicorn>=0.23.0
+requests>=2.31.0
+
+# RS training (Approach B)
+torch>=2.0.0
+tqdm>=4.66.0
+
+# Config & utils
+pyyaml>=6.0
+python-dotenv>=1.0.0
