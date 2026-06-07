@@ -156,9 +156,17 @@ def _extract_json(text: str) -> dict:
 def _call_llm(prompt: str, max_new_tokens: int = MAX_NEW_TOKENS) -> str:
     _load_model()
     messages = [{"role": "user", "content": prompt}]
-    input_ids = _tokenizer.apply_chat_template(
+
+    # apply_chat_template returns a tensor in some transformers versions and a
+    # BatchEncoding (dict-like) in others — handle both.
+    chat_output = _tokenizer.apply_chat_template(
         messages, return_tensors="pt", add_generation_prompt=True,
-    ).to(_device)
+    )
+    if isinstance(chat_output, dict) or hasattr(chat_output, "input_ids"):
+        input_ids = chat_output["input_ids"].to(_device)
+    else:
+        input_ids = chat_output.to(_device)
+
     with torch.no_grad():
         output_ids = _model.generate(
             input_ids,
