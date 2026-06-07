@@ -170,3 +170,73 @@ def run_approach_b(
             print(f"[approach_b] Failed for n={n}: {e}")
             results.append({"n_synthetic_users": n, "error": str(e)})
     return results
+
+
+def run_approach_b(
+    sim_interactions: list[dict] | pd.DataFrame,
+    real_train_behaviors: pd.DataFrame,
+    real_test_behaviors: pd.DataFrame,
+    ncf_config: dict | None = None,
+    ablation_sizes: list[int] | None = None,
+    k: int = 10,
+    seed: int = 42,
+) -> dict:
+    """
+    Notebook-facing entry point.
+    Returns {'results': [{'setting', 'ndcg_at_k', 'recall_at_k'}, ...]}.
+    """
+    from data.mind_loader import parse_impressions
+
+    cfg = {
+        "emb_dim":    ncf_config.get("emb_dim",    32)  if ncf_config else 32,
+        "epochs":     ncf_config.get("epochs",     10)  if ncf_config else 10,
+        "batch_size": ncf_config.get("batch_size", 256) if ncf_config else 256,
+        "lr":         ncf_config.get("lr",         1e-3) if ncf_config else 1e-3,
+    }
+    ablation_sizes = ablation_sizes or [100, 500, 1000]
+
+    # Normalise sim_interactions to DataFrame
+    if not isinstance(sim_interactions, pd.DataFrame):
+        sim_df = pd.DataFrame(sim_interactions)
+    else:
+        sim_df = sim_interactions.copy()
+
+    # Build real test interactions from behaviors
+    real_test_rows = []
+    for _, row in real_test_behaviors.iterrows():
+        uid = row["user_id"]
+        for imp in parse_impressions(row.get("impressions", "")):
+            real_test_rows.append({
+                "user_id": uid,
+                "news_id": imp["news_id"],
+                "clicked": imp["clicked"],
+            })
+    real_test_df = pd.DataFrame(real_test_rows)
+
+    results = []
+    for n in ablation_sizes:
+        users_subset = sim_df["user_id"].unique()[:n]
+        subset = sim_df[sim_df["user_id"].isin(users_subset)]
+        setting = f"synthetic_n={n}"
+        if subset.empty or subset["clicked"].sum() == 0:
+            results.append({
+                "setting": setting,
+                f"ndcg_at_{k}": 0.0,
+                f"recall_at_{k}": 0.0,
+            })
+            continue
+        try:
+            torch.manual_seed(seed)
+            model, user_map, item_map = train_ncf(subset, **cfg)
+            metrics = evaluate_on_real(model, user_map, item_map, real_test_df, k=k)
+            results.append({
+                "setting": setting,
+                f"ndcg_at_{k}": metrics["ndcg@k"],
+                f"recall_at_{k}": metrics["recall@k"],
+                "n_evaluated": metrics["n_evaluated"],
+            })
+        except Exception as e:
+            print(f"[approach_b] n={n} failed: {e}")
+            results.append({"setting": setting, "error": str(e)})
+
+    return {"results": results}

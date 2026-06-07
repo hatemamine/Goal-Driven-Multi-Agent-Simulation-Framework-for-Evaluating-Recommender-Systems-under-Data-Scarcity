@@ -103,3 +103,15 @@ def fetch_all_interactions(db_path: str) -> list[dict]:
     rows = [dict(zip(cols, row)) for row in cur.fetchall()]
     con.close()
     return rows
+
+
+def fetch_all_users(db_path: str) -> list[dict]:
+    con = sqlite3.connect(db_path, check_same_thread=False)
+    cur = con.execute(
+        "SELECT user_id, archetype, language_pref, goal, role, reading_style, "
+        "session_budget, topics FROM virtual_users ORDER BY user_id"
+    )
+    cols = [d[0] for d in cur.description]
+    rows = [dict(zip(cols, row)) for row in cur.fetchall()]
+    con.close()
+    return rows
