@@ -8,9 +8,13 @@ faiss-cpu>=1.7.4
 numpy>=1.24.0
 scipy>=1.11.0
 
-# LLM
-huggingface-hub>=0.23.0
+# LLM — local inference
+transformers>=4.45.0
+accelerate>=0.30.0
+huggingface-hub>=0.23.0   # still needed for model download (hf_hub_download)
 jinja2>=3.1.0
+# Optional: 4-bit NF4 quantisation on CUDA (recommended for GPU runs)
+# bitsandbytes>=0.43.0
 
 # Data
 pandas>=2.0.0

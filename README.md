@@ -8,7 +8,7 @@ A simulation framework that uses goal-driven LLM agents inside a RecSim environm
 
 **Dataset**: [MIND](https://msnews.github.io/) (MIND-small: 50K users by default; MIND-large: 1M via config flag)  
 **Simulation**: [RecSim](https://github.com/google-research/recsim) (actual library, Gym-compatible environment)  
-**LLM Judge**: `google/gemma-4-E4B-it` via HuggingFace Inference API  
+**LLM Judge**: `google/gemma-4-E4B-it` running locally via `transformers` (4-bit NF4 on GPU, float32 fallback on CPU)  
 **Agent language**: Bilingual — English + French (configurable per persona archetype)
 
 ## Project Structure

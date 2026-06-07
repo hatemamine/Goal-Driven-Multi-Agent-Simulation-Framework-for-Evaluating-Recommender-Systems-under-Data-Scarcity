@@ -1,14 +1,20 @@
 """
-Pure LLM judge using google/gemma-4-E4B-it via HuggingFace Inference API.
+Pure LLM judge using google/gemma-4-E4B-it running locally via transformers.
 Bilingual: English (en) and French (fr), driven by the `lang` parameter.
 
 Results are cached by sha256(goal[:120])×doc_id×lang in a local SQLite DB
-to avoid redundant API calls across sessions and users with similar goals.
+to avoid redundant inference calls across sessions and users with similar goals.
+
+Model loading strategy (auto-detected at first call):
+  1. CUDA available + bitsandbytes installed  → 4-bit NF4 quantisation on GPU
+  2. CUDA available, no bitsandbytes          → float16 on GPU
+  3. CPU only                                 → float32 on CPU (slow but functional)
 
 Required env vars:
-  HF_TOKEN           — HuggingFace access token
-  HF_MODEL           — override model (default: google/gemma-4-E4B-it)
+  HF_TOKEN           — HuggingFace token to download gated Gemma weights
+  HF_MODEL           — override model ID (default: google/gemma-4-E4B-it)
   JUDGE_CACHE_PATH   — override cache DB path (default: data/judge_cache.db)
+  LLM_MAX_NEW_TOKENS — override max generation tokens (default: 512)
 """
 
 from __future__ import annotations
@@ -20,28 +26,75 @@ import re
 import sqlite3
 from pathlib import Path
 
-from huggingface_hub import InferenceClient
+import torch
 from jinja2 import Environment, FileSystemLoader
 
-MODEL = os.getenv("HF_MODEL", "google/gemma-4-E4B-it")
-CACHE_PATH = os.getenv("JUDGE_CACHE_PATH", "data/judge_cache.db")
+MODEL_ID   = os.getenv("HF_MODEL",           "google/gemma-4-E4B-it")
+CACHE_PATH = os.getenv("JUDGE_CACHE_PATH",   "data/judge_cache.db")
+MAX_NEW_TOKENS = int(os.getenv("LLM_MAX_NEW_TOKENS", "512"))
 
-_client: InferenceClient | None = None
+_model     = None
+_tokenizer = None
+_device    = None
 _jinja: Environment | None = None
 _cache_con: sqlite3.Connection | None = None
 
 
-# ── Lazy singletons ───────────────────────────────────────────────────────────
+# ── Model loading ─────────────────────────────────────────────────────────────
 
-def _get_client() -> InferenceClient:
-    global _client
-    if _client is None:
-        _client = InferenceClient(
-            model=MODEL,
-            token=os.environ.get("HF_TOKEN"),
+def _load_model():
+    global _model, _tokenizer, _device
+    if _model is not None:
+        return
+
+    from transformers import AutoTokenizer, AutoModelForCausalLM
+
+    hf_token = os.environ.get("HF_TOKEN")
+    print(f"[llm] Loading {MODEL_ID} locally ...")
+
+    _tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, token=hf_token)
+
+    cuda_available = torch.cuda.is_available()
+    _device = "cuda" if cuda_available else "cpu"
+
+    if cuda_available:
+        try:
+            from transformers import BitsAndBytesConfig
+            bnb_cfg = BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_quant_type="nf4",
+                bnb_4bit_use_double_quant=True,
+                bnb_4bit_compute_dtype=torch.float16,
+            )
+            _model = AutoModelForCausalLM.from_pretrained(
+                MODEL_ID,
+                quantization_config=bnb_cfg,
+                device_map="auto",
+                token=hf_token,
+            )
+            print(f"[llm] Loaded in 4-bit NF4 on GPU.")
+        except (ImportError, Exception) as e:
+            print(f"[llm] bitsandbytes unavailable ({e}), loading float16 on GPU.")
+            _model = AutoModelForCausalLM.from_pretrained(
+                MODEL_ID,
+                torch_dtype=torch.float16,
+                device_map="auto",
+                token=hf_token,
+            )
+    else:
+        print("[llm] No CUDA — loading float32 on CPU (slow).")
+        _model = AutoModelForCausalLM.from_pretrained(
+            MODEL_ID,
+            torch_dtype=torch.float32,
+            token=hf_token,
         )
-    return _client
+        _model = _model.to("cpu")
 
+    _model.eval()
+    print(f"[llm] Model ready on {_device}.")
+
+
+# ── Lazy singletons ───────────────────────────────────────────────────────────
 
 def _get_jinja() -> Environment:
     global _jinja
@@ -101,12 +154,31 @@ def _extract_json(text: str) -> dict:
     return {}
 
 
-def _call_llm(prompt: str, max_tokens: int = 512) -> str:
-    response = _get_client().chat_completion(
-        messages=[{"role": "user", "content": prompt}],
-        max_tokens=max_tokens,
-    )
-    return response.choices[0].message.content
+def _call_llm(prompt: str, max_new_tokens: int = MAX_NEW_TOKENS) -> str:
+    _load_model()
+
+    messages = [{"role": "user", "content": prompt}]
+
+    # Use chat template (Gemma instruct format)
+    input_ids = _tokenizer.apply_chat_template(
+        messages,
+        return_tensors="pt",
+        add_generation_prompt=True,
+    ).to(_device)
+
+    with torch.no_grad():
+        output_ids = _model.generate(
+            input_ids,
+            max_new_tokens=max_new_tokens,
+            do_sample=False,          # greedy — deterministic, fast
+            temperature=None,
+            top_p=None,
+            pad_token_id=_tokenizer.eos_token_id,
+        )
+
+    # Decode only the newly generated tokens (skip the prompt)
+    new_tokens = output_ids[0][input_ids.shape[-1]:]
+    return _tokenizer.decode(new_tokens, skip_special_tokens=True)
 
 
 def _normalize_relevance(raw: float | int | str) -> float:
@@ -114,7 +186,6 @@ def _normalize_relevance(raw: float | int | str) -> float:
         v = float(raw)
     except (TypeError, ValueError):
         return 0.0
-    # Model may return 0/1/2 scale — normalise to 0–1
     if v > 1.0:
         v = v / 2.0
     return max(0.0, min(1.0, v))
@@ -133,9 +204,7 @@ def judge_relevance(
 ) -> dict:
     """
     Judge how relevant a news article is to a user's reading goal.
-
-    Returns:
-        {"relevance": float (0-1), "reason": str}
+    Returns {"relevance": float (0-1), "reason": str}.
     """
     cache = _get_cache()
     key = _cache_key(user_goal, doc_id, lang, "relevance")
@@ -180,9 +249,7 @@ def judge_goal_progress(
 ) -> dict:
     """
     Judge how much progress a user has made toward their reading goal after a session.
-
-    Returns:
-        {"progress": float (0-1), "gaps": str}
+    Returns {"progress": float (0-1), "gaps": str}.
     """
     history_str = "; ".join(f'"{t}"' for t in clicked_titles[:10])
     tpl = _get_jinja().get_template(f"judge_{lang}.j2")
@@ -205,8 +272,8 @@ def judge_goal_progress(
 
 def generate(prompt: str, schema: dict, lang: str = "en") -> dict:
     """
-    General-purpose generation call used by user_generator and agent.
-    Appends a compact schema hint to the prompt and parses JSON output.
+    General-purpose structured generation used by user_generator and agent.
+    Appends a compact schema hint and parses the JSON output.
     """
     def _hint(s: dict) -> str:
         props = s.get("properties", {})
@@ -227,8 +294,8 @@ def generate(prompt: str, schema: dict, lang: str = "en") -> dict:
         "Reply with a valid JSON object only — no explanation, no markdown — "
         f"matching this structure:\n{_hint(schema)}"
     )
-    raw = _call_llm(full_prompt, max_tokens=1024)
+    raw = _call_llm(full_prompt, max_new_tokens=1024)
     result = _extract_json(raw)
     if not result:
-        raise ValueError(f"Could not parse JSON from LLM output:\n{raw[:400]}")
+        raise ValueError(f"Could not parse JSON from model output:\n{raw[:400]}")
     return result
