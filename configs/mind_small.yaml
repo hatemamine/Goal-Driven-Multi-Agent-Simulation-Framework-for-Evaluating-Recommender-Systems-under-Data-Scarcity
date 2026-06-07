@@ -1,17 +1,21 @@
 dataset:
   name: mind_small
   mind_path: data/mind_small
-  news_file: data/mind_small/train/news.tsv
-  behaviors_train: data/mind_small/train/behaviors.tsv
-  behaviors_test: data/mind_small/dev/behaviors.tsv
+  train_news_path: data/MINDsmall_train/news.tsv
+  train_behaviors_path: data/MINDsmall_train/behaviors.tsv
+  dev_news_path: data/MINDsmall_dev/news.tsv
+  dev_behaviors_path: data/MINDsmall_dev/behaviors.tsv
   n_users: 50000
+  test_ratio: 0.2
+  min_real_user_clicks: 5
 
 ir:
-  embed_model: all-MiniLM-L6-v2
+  model: all-MiniLM-L6-v2
   index_path: data/faiss_small.index
   ids_path: data/corpus_ids_small.npy
   embeddings_path: data/embeddings_small.npy
-  news_db_path: data/news_small.db
+  db_path: data/news_small.db
+  batch_size: 512
 
 simulation:
   sim_db_path: data/simulation_small.db
@@ -24,6 +28,9 @@ simulation:
   max_virtual_users: 100
   use_llm_persona: true
 
+recommender:
+  top_k: 10
+
 ncf:
   emb_dim: 32
   epochs: 10
@@ -31,7 +38,10 @@ ncf:
   lr: 0.001
 
 evaluation:
+  k: 10
   replay_k: 10
   approach_b_k: 10
-
-ablation_sizes: [100, 500, 1000]
+  n_ablation_sizes: [100, 500, 1000]
+  min_real_user_clicks: 5
+  test_ratio: 0.2
+  seed: 42
