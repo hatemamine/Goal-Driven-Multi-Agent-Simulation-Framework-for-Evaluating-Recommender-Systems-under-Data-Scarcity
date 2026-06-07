@@ -48,16 +48,18 @@ class MindDocumentSampler(AbstractDocumentSampler):
 
     def __init__(
         self,
-        news_df,
+        news_df=None,
         faiss_index=None,
         corpus_ids=None,
         embeddings=None,
         db_con=None,
         embed_model=None,
+        num_candidates: int = 20,
         seed: int = 42,
     ):
         super().__init__(seed=seed)
-        self._df = news_df.reset_index(drop=True)
+        import pandas as pd
+        self._df = news_df.reset_index(drop=True) if news_df is not None else pd.DataFrame()
         self._faiss = faiss_index
         self._corpus_ids = corpus_ids
         self._embeddings = embeddings

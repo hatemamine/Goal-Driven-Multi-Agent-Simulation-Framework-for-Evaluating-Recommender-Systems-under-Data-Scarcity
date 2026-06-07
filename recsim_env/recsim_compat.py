@@ -140,7 +140,8 @@ class Environment:
             if getattr(r, "clicked", False)
         )
         done = self._user_model.is_terminal()
-        return obs, reward, done, {}
+        info = {"response": [r.create_observation() for r in responses]}
+        return obs, reward, done, info
 
     def _observation(self) -> dict:
         user_obs = self._user_model._user_state.create_observation()
@@ -169,7 +170,8 @@ class RecSimGymEnv:
         obs = self._env._observation()
         reward = self._reward_aggregator(responses)
         done = self._env._user_model.is_terminal()
-        return obs, reward, done, {}
+        info = {"response": [r.create_observation() for r in responses]}
+        return obs, reward, done, info
 
     @property
     def environment(self):

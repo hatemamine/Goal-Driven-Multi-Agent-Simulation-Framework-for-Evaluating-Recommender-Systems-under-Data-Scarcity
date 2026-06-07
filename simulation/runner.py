@@ -119,19 +119,25 @@ def _run_one_user(
 def run_simulation(
     config: dict,
     virtual_users: list[dict],
-    news_df_path: str,
-    index_path: str,
-    ids_path: str,
-    embeddings_path: str,
-    db_path_news: str,
-    db_path_sim: str,
-    parallel_workers: int = 4,
-    n_sessions: int = 3,
-):
+    parallel_workers: int = 1,
+) -> list[dict]:
+    """Run simulation for all virtual users. Returns list of {user_id, ok, error}."""
+    ds = config["dataset"]
+    ir = config["ir"]
+    sim = config["simulation"]
+
+    news_df_path    = ds["train_news_path"]
+    index_path      = ir["index_path"]
+    ids_path        = ir["ids_path"]
+    embeddings_path = ir["embeddings_path"]
+    db_path_news    = ir["db_path"]
+    db_path_sim     = sim["sim_db_path"]
+    n_sessions      = sim.get("n_sessions", 3)
+
     kwargs_list = [
         dict(
             profile=u,
-            config=config,
+            config=sim,
             news_df_path=news_df_path,
             index_path=index_path,
             ids_path=ids_path,
@@ -144,9 +150,17 @@ def run_simulation(
         for u in virtual_users
     ]
 
+    results = []
     if parallel_workers <= 1:
-        for kwargs in kwargs_list:
-            _run_one_user(**kwargs)
+        for kw in kwargs_list:
+            uid = kw["profile"]["user_id"]
+            try:
+                _run_one_user(**kw)
+                results.append({"user_id": uid, "ok": True})
+                print(f"[runner] {uid} done.")
+            except Exception as e:
+                print(f"[runner] {uid} FAILED: {e}")
+                results.append({"user_id": uid, "ok": False, "error": str(e)})
     else:
         with ProcessPoolExecutor(max_workers=parallel_workers) as pool:
             futures = {pool.submit(_run_one_user, **kw): kw["profile"]["user_id"]
@@ -156,5 +170,8 @@ def run_simulation(
                 try:
                     fut.result()
                     print(f"[runner] {uid} done.")
+                    results.append({"user_id": uid, "ok": True})
                 except Exception as e:
                     print(f"[runner] {uid} FAILED: {e}")
+                    results.append({"user_id": uid, "ok": False, "error": str(e)})
+    return results

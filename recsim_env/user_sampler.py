@@ -6,7 +6,7 @@ from recsim_env.user_state import MindUserState
 
 
 class MindUserSampler(AbstractUserSampler):
-    def __init__(self, user_profiles: list[dict], seed: int = 42):
+    def __init__(self, user_profiles: list[dict], embed_model=None, seed: int = 42):
         super().__init__(seed=seed)
         self._profiles = user_profiles
         self._idx = 0

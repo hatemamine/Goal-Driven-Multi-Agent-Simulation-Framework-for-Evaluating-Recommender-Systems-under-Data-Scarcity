@@ -90,3 +90,16 @@ def insert_interaction(con: sqlite3.Connection, row: dict):
         row,
     )
     con.commit()
+
+
+def fetch_all_interactions(db_path: str) -> list[dict]:
+    con = sqlite3.connect(db_path, check_same_thread=False)
+    cur = con.execute(
+        "SELECT user_id, session_id, session_num, step, position, news_id, title, "
+        "category, clicked, dwell_time, relevance, fatigue, language FROM interactions "
+        "ORDER BY user_id, session_num, step"
+    )
+    cols = [d[0] for d in cur.description]
+    rows = [dict(zip(cols, row)) for row in cur.fetchall()]
+    con.close()
+    return rows

@@ -6,13 +6,18 @@ from jinja2 import Environment, FileSystemLoader
 
 
 class GoalDrivenAgent:
-    def __init__(self, slate_size: int = 5):
+    def __init__(self, user_profile: dict | None = None, slate_size: int = 5, max_steps: int = 30):
         self._slate_size = slate_size
-        self._user_profile: dict = {}
+        self._max_steps = max_steps
+        self._user_profile: dict = user_profile or {}
         self._step: int = 0
         prompts_dir = Path(__file__).parent.parent / "llm" / "prompts"
         self._jinja = Environment(loader=FileSystemLoader(str(prompts_dir)), trim_blocks=True)
-        self._lang = "en"
+        self._lang = self._user_profile.get("language_pref", "en")
+
+    @property
+    def should_stop(self) -> bool:
+        return self._step >= self._max_steps
 
     def reset(self, user_profile: dict):
         self._user_profile = user_profile

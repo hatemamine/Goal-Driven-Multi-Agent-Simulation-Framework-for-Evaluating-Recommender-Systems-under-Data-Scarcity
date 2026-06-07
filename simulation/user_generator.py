@@ -37,6 +37,7 @@ def _fallback_profile(user_id: str, archetype: dict) -> dict:
         "session_budget": archetype["session_budget"],
         "clicked_titles": [],
         "current_query": archetype["goal_template"][:80],
+        "starting_query": archetype["goal_template"][:80],
     }
 
 
@@ -71,6 +72,7 @@ def _llm_profile(user_id: str, archetype: dict) -> dict:
         "session_budget": int(result.get("session_budget", archetype["session_budget"])),
     })
     profile["current_query"] = profile["goal"][:80]
+    profile["starting_query"] = profile["goal"][:80]
     return profile
 
 
