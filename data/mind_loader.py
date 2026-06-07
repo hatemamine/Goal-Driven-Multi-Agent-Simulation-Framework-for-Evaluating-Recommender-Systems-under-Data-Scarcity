@@ -73,16 +73,34 @@ def filter_active_users(behaviors_df: pd.DataFrame, min_clicks: int = 5) -> pd.D
     return behaviors_df[behaviors_df["user_id"].isin(active_ids)]
 
 
+_ARCHETYPE_NAMES = [
+    "breaking_news_follower",
+    "topic_specialist",
+    "casual_browser",
+    "sentiment_tracker",
+    "deep_reader",
+    "cluster_5",
+    "cluster_6",
+    "cluster_7",
+]
+
+
 def cluster_users(behaviors_df: pd.DataFrame, news_df: pd.DataFrame,
                   n_clusters: int = 5, seed: int = 42):
     from sklearn.cluster import KMeans
     cat_map = news_df.set_index("news_id")["coarse_category"].to_dict()
     clicks = extract_user_click_sequences(behaviors_df)
     clicks["coarse_category"] = clicks["news_id"].map(cat_map).fillna("general")
-    cats = clicks["coarse_category"].unique().tolist()
     pivot = clicks.groupby(["user_id", "coarse_category"]).size().unstack(fill_value=0)
     pivot = pivot.div(pivot.sum(axis=1), axis=0).fillna(0)
     km = KMeans(n_clusters=n_clusters, random_state=seed, n_init=10)
-    pivot["cluster"] = km.fit_predict(pivot.values)
-    dist = (pivot["cluster"].value_counts(normalize=True).sort_index().values)
-    return pivot.reset_index()[["user_id", "cluster"]], dist.tolist()
+    labels = km.fit_predict(pivot.values)
+    pivot["cluster"] = labels
+
+    archetype_names = _ARCHETYPE_NAMES[:n_clusters]
+    pivot["archetype"] = [archetype_names[c] for c in labels]
+
+    freq = pivot["cluster"].value_counts(normalize=True).sort_index()
+    dist = {archetype_names[k]: float(v) for k, v in freq.items()}
+
+    return pivot.reset_index()[["user_id", "cluster", "archetype"]], dist
